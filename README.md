@@ -206,7 +206,7 @@ This is a single-developer project during its initial development. Contributor g
 
 ## Author
 
-Your Name
+Daniel Laffan
 
 ## License
 
