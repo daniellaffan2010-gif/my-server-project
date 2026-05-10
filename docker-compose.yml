@@ -1,0 +1,81 @@
+version: "3.9"
+
+services:
+
+  # ── API Server ──────────────────────────────────────────────────────────────
+  api:
+    build: ./src/api
+    container_name: infra_api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://infra_user:infra_pass@db:5432/infra_db
+      REDIS_URL: redis://cache:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── PostgreSQL Database ─────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: infra_db
+    environment:
+      POSTGRES_USER: infra_user
+      POSTGRES_PASSWORD: infra_pass
+      POSTGRES_DB: infra_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infra_user -d infra_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── Redis Cache / Queue ─────────────────────────────────────────────────────
+  cache:
+    image: redis:7-alpine
+    container_name: infra_cache
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── Worker Service ──────────────────────────────────────────────────────────
+  worker:
+    build: ./src/worker
+    container_name: infra_worker
+    environment:
+      DATABASE_URL: postgresql://infra_user:infra_pass@db:5432/infra_db
+      REDIS_URL: redis://cache:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+# ── Shared network ──────────────────────────────────────────────────────────
+networks:
+  infra_net:
+    driver: bridge
+
+# ── Named volumes (data survives container restarts) ────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
