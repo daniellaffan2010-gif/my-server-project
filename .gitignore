@@ -1,0 +1,10 @@
+# Virtual environment — never commit this
+venv/
+
+# Python cache files — generated automatically, not needed in Git
+__pycache__/
+*.pyc
+*.pyo
+
+# Environment variables (API keys etc — keep these secret)
+.env
