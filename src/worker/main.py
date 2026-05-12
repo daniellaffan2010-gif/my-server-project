@@ -6,8 +6,13 @@ In Year 1 this does a simple rule-based check; later it will call the Claude age
 import os
 import json
 import time
+import threading
 import redis
 import psycopg2
+from prometheus_client import start_http_server, Counter, Summary
+
+JOBS_PROCESSED = Counter('worker_jobs_processed_total', 'Total jobs processed', ['status'])
+JOB_DURATION = Summary('worker_job_duration_seconds', 'Time spent processing a job')
 
 REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -45,6 +50,8 @@ def process_job(job: dict) -> dict:
 
 
 def run():
+    start_http_server(8001)
+    print("Metrics server started on port 8001")
     print("Worker started. Waiting for jobs on Redis queue 'jobs'...")
     while True:
         # Blocking pop — waits up to 5s for a job, then loops
@@ -57,7 +64,8 @@ def run():
         job_id = job["job_id"]
         print(f"Processing job {job_id} for service '{job.get('service_name')}'")
 
-        result = process_job(job)
+        with JOB_DURATION.time():
+            result = process_job(job)
 
         conn = get_db()
         with conn.cursor() as cur:
@@ -68,6 +76,7 @@ def run():
         conn.commit()
         conn.close()
 
+        JOBS_PROCESSED.labels(status='complete').inc()
         print(f"Job {job_id} complete: {result['diagnosis']}")
 
 

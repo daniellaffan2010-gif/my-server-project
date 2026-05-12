@@ -58,6 +58,8 @@ services:
   worker:
     build: ./src/worker
     container_name: infra_worker
+    ports:
+      - "8001:8001"
     environment:
       DATABASE_URL: postgresql://infra_user:infra_pass@db:5432/infra_db
       REDIS_URL: redis://cache:6379/0
@@ -66,6 +68,54 @@ services:
         condition: service_healthy
       cache:
         condition: service_healthy
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── Postgres Exporter ───────────────────────────────────────────────────────
+  postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: infra_postgres_exporter
+    environment:
+      DATA_SOURCE_NAME: postgresql://infra_user:infra_pass@db:5432/infra_db?sslmode=disable
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── Redis Exporter ──────────────────────────────────────────────────────────
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.61.0
+    container_name: infra_redis_exporter
+    environment:
+      REDIS_ADDR: redis://cache:6379
+    depends_on:
+      cache:
+        condition: service_healthy
+    networks:
+      - infra_net
+    restart: unless-stopped
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: infra_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+    depends_on:
+      - api
+      - worker
+      - postgres_exporter
+      - redis_exporter
     networks:
       - infra_net
     restart: unless-stopped
@@ -79,3 +129,4 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  prometheus_data:
