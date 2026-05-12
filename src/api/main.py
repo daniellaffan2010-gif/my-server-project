@@ -10,8 +10,10 @@ import redis
 import psycopg2
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from prometheus_fastapi_instrumentator import Instrumentator
 
 app = FastAPI(title="Infra Intelligence API", version="0.1.0")
+Instrumentator().instrument(app).expose(app)
 
 REDIS_URL = os.environ["REDIS_URL"]
 DATABASE_URL = os.environ["DATABASE_URL"]
