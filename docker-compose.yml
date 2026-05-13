@@ -2,7 +2,6 @@ version: "3.9"
 
 services:
 
-  # ── API Server ──────────────────────────────────────────────────────────────
   api:
     build: ./src/api
     container_name: infra_api
@@ -20,7 +19,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── PostgreSQL Database ─────────────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: infra_db
@@ -39,7 +37,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Redis Cache / Queue ─────────────────────────────────────────────────────
   cache:
     image: redis:7-alpine
     container_name: infra_cache
@@ -54,7 +51,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Worker Service ──────────────────────────────────────────────────────────
   worker:
     build: ./src/worker
     container_name: infra_worker
@@ -72,7 +68,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Postgres Exporter ───────────────────────────────────────────────────────
   postgres_exporter:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     container_name: infra_postgres_exporter
@@ -85,7 +80,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Redis Exporter ──────────────────────────────────────────────────────────
   redis_exporter:
     image: oliver006/redis_exporter:v1.61.0
     container_name: infra_redis_exporter
@@ -98,7 +92,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Prometheus ──────────────────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.52.0
     container_name: infra_prometheus
@@ -120,7 +113,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Loki (Log Aggregation) ──────────────────────────────────────────────────
   loki:
     image: grafana/loki:2.9.5
     container_name: infra_loki
@@ -134,7 +126,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Promtail (Log Scraper for Loki) ─────────────────────────────────────────
   promtail:
     image: grafana/promtail:2.9.5
     container_name: infra_promtail
@@ -149,7 +140,6 @@ services:
       - infra_net
     restart: unless-stopped
 
-  # ── Grafana ─────────────────────────────────────────────────────────────────
   grafana:
     image: grafana/grafana:10.4.2
     container_name: infra_grafana
@@ -169,12 +159,10 @@ services:
       - infra_net
     restart: unless-stopped
 
-# ── Shared network ──────────────────────────────────────────────────────────
 networks:
   infra_net:
     driver: bridge
 
-# ── Named volumes (data survives container restarts) ────────────────────────
 volumes:
   postgres_data:
   redis_data:
