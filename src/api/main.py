@@ -51,6 +51,7 @@ class DiagnosticRequest(BaseModel):
 
 
 PROMETHEUS_URL = "http://prometheus:9090"
+LOKI_URL = "http://loki:3100"
 
 
 async def prom_query(q: str) -> float | None:
@@ -64,6 +65,38 @@ async def prom_query(q: str) -> float | None:
             return None if (v != v or v == float('inf') or v == float('-inf')) else v
     except Exception:
         return None
+
+
+async def loki_query(limit: int = 50) -> list:
+    """Query recent logs from all containers"""
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(
+                f"{LOKI_URL}/loki/api/v1/query_range",
+                params={
+                    "query": '{job=~"infra_.*"}',
+                    "start": "1h",
+                    "limit": limit
+                }
+            )
+            result = r.json()
+            if result.get("status") != "success":
+                return []
+
+            logs = []
+            for stream in result.get("data", {}).get("result", []):
+                container = stream.get("stream", {}).get("container", "unknown")
+                for timestamp, message in stream.get("values", []):
+                    logs.append({
+                        "container": container,
+                        "timestamp": timestamp,
+                        "message": message
+                    })
+
+            logs.sort(key=lambda x: x["timestamp"], reverse=True)
+            return logs[:limit]
+    except Exception:
+        return []
 
 
 @app.get("/stats")
@@ -88,6 +121,13 @@ async def stats():
         "postgres_up":         pg_up,
         "redis_up":            redis_up,
     }
+
+
+@app.get("/logs")
+async def get_logs():
+    """Fetch recent logs from Loki"""
+    logs = await loki_query(30)
+    return {"logs": logs}
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
@@ -123,6 +163,8 @@ async def dashboard():
 <body>
   <h1>Infra Intelligence Platform</h1>
   <div class="grid" id="grid">Loading...</div>
+  <h2 style="margin-top: 40px; margin-bottom: 16px; font-size: 1.1rem;">Recent Logs</h2>
+  <div id="logs" style="background: #1a1d2e; border-radius: 12px; padding: 16px; border: 1px solid #2a2d3e; font-size: 0.85rem; line-height: 1.6; max-height: 400px; overflow-y: auto; font-family: 'Monaco', 'Menlo', monospace;">Loading logs...</div>
   <footer>Auto-refreshes every 5s &nbsp;|&nbsp; Last updated: <span id="updated">—</span></footer>
   <script>
     function fmt(v, decimals=2) { return v == null ? "N/A" : Number(v).toFixed(decimals); }
@@ -174,6 +216,19 @@ async def dashboard():
           </div>
         `;
         document.getElementById("updated").textContent = new Date().toLocaleTimeString();
+
+        const lr = await fetch("/logs");
+        const ld = await lr.json();
+        const logsHtml = ld.logs.length === 0
+          ? '<span style="color: #666;">No logs yet...</span>'
+          : ld.logs.map(log => {
+            const ts = new Date(parseInt(log.timestamp) / 1000000).toLocaleTimeString();
+            const container = log.container.replace('infra_', '');
+            const colors = { api: '#60a5fa', worker: '#4ade80', db: '#f87171', cache: '#fbbf24' };
+            const color = colors[container] || '#888';
+            return `<div><span style="color: ${color}; font-weight: 600;">[${container}]</span> <span style="color: #999;">${ts}</span> ${log.message}</div>`;
+          }).join('');
+        document.getElementById("logs").innerHTML = logsHtml;
       } catch(e) { console.error(e); }
     }
     refresh();
