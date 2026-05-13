@@ -58,7 +58,10 @@ async def prom_query(q: str) -> float | None:
         async with httpx.AsyncClient(timeout=3) as client:
             r = await client.get(f"{PROMETHEUS_URL}/api/v1/query", params={"query": q})
             result = r.json()["data"]["result"]
-            return float(result[0]["value"][1]) if result else None
+            if not result:
+                return None
+            v = float(result[0]["value"][1])
+            return None if (v != v or v == float('inf') or v == float('-inf')) else v
     except Exception:
         return None
 
