@@ -3,6 +3,11 @@ auth_enabled: false
 ingester:
   chunk_idle_period: 3m
   max_chunk_age: 1h
+  lifecycler:
+    ring:
+      kvstore:
+        store: inmemory
+      replication_factor: 1
 
 limits_config:
   enforce_metric_name: false
@@ -12,22 +17,16 @@ limits_config:
 schema_config:
   configs:
     - from: 2020-10-24
-      store: boltdb
-      object_store: filesystem
+      store: inmemory
       schema: v11
-      index:
-        prefix: index_
-        period: 24h
 
 server:
   http_listen_port: 3100
   log_level: info
 
 storage_config:
-  filesystem:
-    directory: /tmp/loki/chunks
-  boltdb:
-    directory: /tmp/loki/boltdb
-
-chunk_store_config:
-  max_look_back_period: 0s
+  index_cache_validity: 5m
+  cache_config:
+    enable_fifocache: true
+    fifocache:
+      max_size_items: 1024
